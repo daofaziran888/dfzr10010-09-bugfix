@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import Overview from '@/views/Overview.vue'
 const Tablefmt = () => import('@/views/tablefmt/index.vue')
+const Fieldcheck = () => import('@/views/fieldcheck/index.vue')
 const Compact = () => import('@/views/compact/index.vue')
 const Compress = () => import('@/views/compress/index.vue')
 const Metadata = () => import('@/views/metadata/index.vue')
@@ -23,6 +24,7 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'overview', component: Overview },
     { path: '/tablefmt', name: 'tablefmt', component: Tablefmt },
+    { path: '/fieldcheck', name: 'fieldcheck', component: Fieldcheck },
     { path: '/compact', name: 'compact', component: Compact },
     { path: '/compress', name: 'compress', component: Compress },
     { path: '/metadata', name: 'metadata', component: Metadata },

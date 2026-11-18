@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.fieldcheck import fieldcheck_service
 
 MODULE = "cleanup"
 REQUIRED_FIELDS = ["策略编号", "目标表名", "过期条件"]
@@ -58,4 +59,12 @@ class CleanupService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        table_name = str(entry.get("目标表名", "")).strip()
+        if table_name:
+            fieldcheck_service.sync_business_result(
+                source="数据过期清理",
+                table=table_name,
+                item=f"{action}处理",
+                detail=f"数据过期清理记录 {entry.get('策略编号')} 执行{action}，状态推进至{target}",
+            )
         return entry, f"清理策略已{action}"

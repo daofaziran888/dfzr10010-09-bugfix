@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.fieldcheck import fieldcheck_service
 
 MODULE = "compress"
 REQUIRED_FIELDS = ["配置编号", "目标表名", "压缩算法"]
@@ -58,4 +59,12 @@ class CompressService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        table_name = str(entry.get("目标表名", "")).strip()
+        if table_name:
+            fieldcheck_service.sync_business_result(
+                source="数据压缩策略",
+                table=table_name,
+                item=f"{action}处理",
+                detail=f"数据压缩策略记录 {entry.get('配置编号')} 执行{action}，状态推进至{target}",
+            )
         return entry, f"压缩配置已{action}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.fieldcheck import fieldcheck_service
 
 MODULE = "rollback"
 REQUIRED_FIELDS = ["记录编号", "表名称", "回滚版本"]
@@ -58,4 +59,12 @@ class RollbackService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        table_name = str(entry.get("表名称", "")).strip()
+        if table_name:
+            fieldcheck_service.sync_business_result(
+                source="数据回滚恢复",
+                table=table_name,
+                item=f"{action}处理",
+                detail=f"数据回滚恢复记录 {entry.get('记录编号')} 执行{action}，状态推进至{target}",
+            )
         return entry, f"回滚记录已{action}"

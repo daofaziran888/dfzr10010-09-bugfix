@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas import ActionResult, EntryPayload, PageResult
+from app.services.fieldcheck import fieldcheck_service
 from app.services.tablefmt import TablefmtService
 
 router = APIRouter(prefix="/api/tablefmt", tags=["湖表格式管理"])
@@ -18,7 +19,7 @@ STATUSES = ["草稿", "已创建", "已优化", "已废弃"]
 
 @router.get("", response_model=PageResult[dict])
 def list_entries(
-    keyword: str | None = Query(default=None, description="按配置编号检索"),
+    keyword: str | None = Query(default=None, description="按配置编号或表名称检索"),
     status: str | None = Query(default=None, description="草稿、已创建、已优化、已废弃"),
     page: int = 1,
     size: int = 20,
@@ -30,6 +31,13 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出湖表格式管理清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "tablefmt", "total": total, "items": items}
+
+
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
     """读取单条表格式配置明细；不存在时给出可读的错误说明。"""
@@ -39,13 +47,52 @@ def get_entry(entry_id: int) -> dict:
     return entry
 
 
+@router.get("/{entry_id}/datasets")
+def get_datasets(entry_id: int) -> dict[str, Any]:
+    """读取该表的表结构字段数据集版本，以及字段核对清单（两个入口共用同一批结果）。"""
+    entry = service.get_entry(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"表格式配置 {entry_id} 不存在或已归档")
+    table = str(entry.get("表名称", ""))
+    datasets, dataset_total = fieldcheck_service.list_datasets(table=table, page=1, size=10000)
+    checklist, checklist_total = fieldcheck_service.list_checklist(table=table, page=1, size=10000)
+    current = fieldcheck_service.current_dataset(table)
+    return {
+        "表名称": table,
+        "当前数据集编号": current.get("数据集编号", "") if current else "",
+        "datasets": datasets,
+        "dataset_total": dataset_total,
+        "checklist": checklist,
+        "checklist_total": checklist_total,
+    }
+
+
 @router.post("", response_model=ActionResult)
 def create_entry(payload: EntryPayload) -> ActionResult:
-    """登记一条表格式配置，缺字段时说明原因而不是静默丢弃。"""
+    """登记一条表格式配置，分区字段、主键字段、排序字段、版本保留会完整保留。"""
     entry, missing = service.create_entry(payload.values)
     if missing:
         return ActionResult(ok=False, message=f"缺少必填字段：{'、'.join(missing)}")
-    return ActionResult(ok=True, message="表格式配置已登记", entry=entry)
+    return ActionResult(ok=True, message="表格式配置已登记，结构字段已完整保留", entry=entry)
+
+
+@router.put("/{entry_id}", response_model=ActionResult)
+def update_entry(entry_id: int, payload: EntryPayload) -> ActionResult:
+    """重新打开配置后保存：仅草稿态可改，结构字段全量回写，不产生重复或残留记录。"""
+    entry, missing = service.update_entry(entry_id, payload.values)
+    if entry is None:
+        return ActionResult(ok=False, message=f"保存失败：{'、'.join(missing)}")
+    return ActionResult(ok=True, message="表格式配置已保存，分区/主键/版本保留均已保留", entry=entry)
+
+
+@router.post("/{entry_id}/refresh", response_model=ActionResult)
+def refresh_fields(entry_id: int, payload: EntryPayload | None = None) -> ActionResult:
+    """刷新字段清单：与显式配置冲突时开新版本，否则补齐当前版本，下游只留一份当前定义。"""
+    values = payload.values if payload is not None else {}
+    dataset, message = service.refresh_fields(entry_id, values)
+    if dataset is None:
+        return ActionResult(ok=False, message=message)
+    return ActionResult(ok=True, message=message, entry=dataset)
 
 
 @router.post("/{entry_id}/actions", response_model=ActionResult)
@@ -56,10 +103,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出湖表格式管理清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "tablefmt", "total": total, "items": items}

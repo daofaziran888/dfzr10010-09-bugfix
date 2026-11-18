@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.fieldcheck import fieldcheck_service
 
 MODULE = "metadata"
 REQUIRED_FIELDS = ["表编号", "表名称", "字段清单"]
@@ -58,4 +59,12 @@ class MetadataService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        table_name = str(entry.get("表名称", "")).strip()
+        if table_name:
+            fieldcheck_service.sync_business_result(
+                source="元数据服务",
+                table=table_name,
+                item=f"{action}处理",
+                detail=f"元数据服务记录 {entry.get('表编号')} 执行{action}，状态推进至{target}",
+            )
         return entry, f"元数据表已{action}"

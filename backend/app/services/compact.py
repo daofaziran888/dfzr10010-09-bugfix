@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.store import store
+from app.services.fieldcheck import fieldcheck_service
 
 MODULE = "compact"
 REQUIRED_FIELDS = ["任务编号", "目标表名", "文件范围"]
@@ -58,4 +59,12 @@ class CompactService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        table_name = str(entry.get("目标表名", "")).strip()
+        if table_name:
+            fieldcheck_service.sync_business_result(
+                source="小文件合并",
+                table=table_name,
+                item=f"{action}处理",
+                detail=f"小文件合并记录 {entry.get('任务编号')} 执行{action}，状态推进至{target}",
+            )
         return entry, f"合并任务已{action}"

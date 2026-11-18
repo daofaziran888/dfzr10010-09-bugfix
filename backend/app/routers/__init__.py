@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from app.routers import tablefmt as router_tablefmt
+from app.routers import fieldcheck as router_fieldcheck
 from app.routers import compact as router_compact
 from app.routers import compress as router_compress
 from app.routers import metadata as router_metadata
@@ -23,4 +24,4 @@ from app.routers import schedule as router_schedule
 from app.routers import stats as router_stats
 from app.routers import migrate as router_migrate
 
-ROUTERS = [router_tablefmt, router_compact, router_compress, router_metadata, router_snapshot, router_branch, router_rollback, router_partition, router_iceberg, router_catalog, router_cleanup, router_quota, router_lineage, router_schedule, router_stats, router_migrate]
+ROUTERS = [router_tablefmt, router_fieldcheck, router_compact, router_compress, router_metadata, router_snapshot, router_branch, router_rollback, router_partition, router_iceberg, router_catalog, router_cleanup, router_quota, router_lineage, router_schedule, router_stats, router_migrate]
